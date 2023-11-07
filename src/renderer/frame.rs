@@ -10,7 +10,7 @@ impl Frame {
         // let mut buf = vec![0_u8; (width * height * 3) as usize];
         // let mut buf = Vec::with_capacity((width * height * 3) as usize);
 
-        let f = Frame {
+        Frame {
             video_data: VideoData::from_buffer(
                 width,
                 height,
@@ -23,13 +23,11 @@ impl Frame {
                 None,
                 buf.as_mut_slice(),
             )
-        };
-        unsafe { f.video_data.p_data().write_bytes(0, (width * height * 3) as usize); }
-        f
+        }
     }
 
     pub fn clear(&mut self) {
-        unsafe { self.video_data.p_data().write_bytes(0, (self.width() * self.height() * 2) as usize); }
+        unsafe { self.video_data.p_data().write_bytes(0, (self.width() * self.height() * 3) as usize); }
     }
 
     pub fn set_pixel(&mut self, x: u32, y: u32, u: u8, v: u8, lum: u8, a: u8) {
@@ -38,14 +36,14 @@ impl Frame {
             return;
         }
         let stride= self.video_data.line_stride_in_bytes().unwrap();
+        let uyvy_plane_offset = y * stride + (x / 2) * 4;
+        let x_offset = (x % 2) * 2;
         let alpha_plane = stride * self.video_data.height();
-        let x_offset = 1 + (x % 2) * 2;
-        let y_offset = y * stride;
         unsafe {
-            *self.video_data.p_data().offset((y_offset + x * 2 + 0) as isize) = u; // U
-            *self.video_data.p_data().offset((y_offset + x * 2 + 2) as isize) = v; // V
-            *self.video_data.p_data().offset((y_offset + x * 2 + x_offset) as isize) = lum; // Y
-            *self.video_data.p_data().offset((alpha_plane + y_offset / 2 + x) as isize) = a; // alpha
+            *self.video_data.p_data().offset((uyvy_plane_offset + 0) as isize) = u; // U
+            *self.video_data.p_data().offset((uyvy_plane_offset + 1 + x_offset) as isize) = lum; // Y
+            *self.video_data.p_data().offset((uyvy_plane_offset + 2) as isize) = v; // V
+            *self.video_data.p_data().offset((alpha_plane + y * stride / 2 + x) as isize) = a; // alpha
         }
     }
 
@@ -117,6 +115,81 @@ impl Frame {
                 d += 2.0 * dx;
             }
         }
+    }
+
+    pub fn draw_thick_line(&mut self, p0: Point2<f32>, p1: Point2<f32>, width: f32, (lum, u, v): (u8, u8, u8)) {
+        if width == 0.0 {
+            return;
+        }
+
+        let (mut p0, mut p1) = (p0, p1);
+
+        // Steep means that the slope is >1
+        let steep = (p1.y - p0.y).abs() > (p1.x - p0.x).abs();
+        // If steep, swap x and y to ensure dx > dy
+        if steep {
+            p0 = p0.yx();
+            p1 = p1.yx();
+        }
+
+        // Swap endpoints to ensure that dx > 0
+        if p0.x > p1.x {
+            (p0, p1) = (p1, p0);
+        }
+
+        let dx = p1.x - p0.x;
+        let dy = p1.y - p0.y;
+        let gradient = if dx > 0.0 { dy / dx } else { 1.0 };
+        // Rotate width
+        let w = width * (1.0 + gradient * gradient).sqrt();
+
+        let (x_pixel_1, mut inter_y) =
+            self.draw_thick_line_endpoint(p0, w, (lum, u, v), gradient, steep);
+        let (x_pixel_2, _) =
+            self.draw_thick_line_endpoint(p1, w, (lum, u, v), gradient, steep);
+        let w = w as u32;
+
+        for x in x_pixel_1 + 1..x_pixel_2 {
+            let f_part = inter_y - inter_y.floor();
+            let rf_part = 1.0 - f_part;
+            let y = inter_y.floor() as u32;
+
+            if steep {
+                self.set_pixel(y, x, u, v, lum, (rf_part * 255.0) as u8);
+                for i in 1..w { self.set_pixel(y + i, x, u, v, lum, 255); }
+                self.set_pixel(y + w, x, u, v, lum, (f_part * 255.0) as u8);
+            } else {
+                self.set_pixel(x, y, u, v, lum, (rf_part * 255.0) as u8);
+                for i in 1..w { self.set_pixel(x, y + i, u, v, lum, 255); }
+                self.set_pixel(x, y + w, u, v, lum, (f_part * 255.0) as u8);
+            }
+
+            inter_y += gradient;
+        }
+    }
+
+    fn draw_thick_line_endpoint(&mut self, p: Point2<f32>, w: f32, (y, u, v): (u8, u8, u8), gradient: f32, steep: bool) -> (u32, f32) {
+        // First endpoint
+        let x_end = p.x.round();
+        let y_end = p.y - (w - 1.0) * 0.5 + gradient * (x_end - p.x);
+        let x_gap = 1.0 - (p.x + 0.5 - x_end);
+        let x_pixel = x_end as u32;
+        let y_pixel = y_end.floor() as u32;
+        let f_part = y_end - y_end.floor();
+        let rf_part = 1.0 - f_part;
+        let w = w as u32;
+
+        if steep {
+            self.set_pixel(y_pixel, x_pixel, u, v, y, (rf_part * x_gap) as u8);
+            for i in 1..w { self.set_pixel(y_pixel + i, x_pixel, u, v, y, 255); }
+            self.set_pixel(y_pixel + w, x_pixel, u, v, y, (rf_part * x_gap) as u8);
+        } else {
+            self.set_pixel(x_pixel, y_pixel, u, v, y, (rf_part * x_gap) as u8);
+            for i in 1..w { self.set_pixel(x_pixel, y_pixel + i, u, v, y, 255); }
+            self.set_pixel(x_pixel, y_pixel + w, u, v, y, (rf_part * x_gap) as u8);
+        }
+
+        (x_pixel, y_end + gradient)
     }
 
     pub fn width(&self) -> u32 {
