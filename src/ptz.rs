@@ -37,9 +37,9 @@ impl Ptz {
         *CURRENT_FREED_DATA.lock().unwrap() = freed;
     }
 
-    pub fn yaw_pitch_roll() -> (f32, f32, f32) {
+    pub fn yaw_pitch_zoom() -> (f32, f32, u32) {
         let data = CURRENT_FREED_DATA.lock().unwrap();
 
-        (data.tilt, data.pan, data.roll)
+        (data.tilt, data.pan, data.zoom)
     }
 }

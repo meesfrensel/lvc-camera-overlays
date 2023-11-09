@@ -15,7 +15,7 @@ impl Frame {
                 width,
                 height,
                 FourCCVideoType::UYVA,
-                30,
+                60,
                 1,
                 FrameFormatType::Progressive,
                 0,

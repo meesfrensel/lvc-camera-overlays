@@ -1,8 +1,6 @@
 use std::time::SystemTime;
 use nalgebra::Vector3;
-use crate::freed::FreeD;
 use crate::ptz::Ptz;
-use crate::ndi::VideoData;
 use crate::renderer::camera::Camera;
 use crate::renderer::frame::Frame;
 
@@ -21,9 +19,10 @@ fn main() {
     send_line();
 }
 
-const LINE: (Vector3<f32>, Vector3<f32>) = (Vector3::new(0.0, -2.0, -10.0), Vector3::new(0.0, 0.0, -10.0));
-const LINE2: (Vector3<f32>, Vector3<f32>) = (Vector3::new(-1.0, -1.0, -10.0), Vector3::new(1.0, -1.0, -10.0));
-const LINE3: (Vector3<f32>, Vector3<f32>) = (Vector3::new(-2.0, 1.0, -10.0), Vector3::new(2.0, 0.0, -10.0));
+const LINE: (Vector3<f32>, Vector3<f32>) = (Vector3::new(0.05, -0.36, -1.8), Vector3::new(0.05, 0.0, -1.8));
+const LINE2: (Vector3<f32>, Vector3<f32>) = (Vector3::new(-0.13, -0.18, -1.8), Vector3::new(0.23, -0.18, -1.8));
+const WB_0: (Vector3<f32>, Vector3<f32>) = (Vector3::new(-0.6, 0.11, -1.8), Vector3::new(0.6, 0.11, -1.8));
+const WB_1: (Vector3<f32>, Vector3<f32>) = (Vector3::new(-0.6, -0.79, -1.8), Vector3::new(0.6, -0.79, -1.8));
 
 fn send_line() {
     let send = ndi::SendBuilder::new()
@@ -41,29 +40,32 @@ fn send_line() {
 
         let n_frames = 100;
         for _ in 0..n_frames {
-            let (yaw, pitch, roll) = Ptz::yaw_pitch_roll();
-            camera.set_rotation(yaw, pitch, roll);
+            let (yaw, pitch, zoom) = Ptz::yaw_pitch_zoom();
+            camera.set_rotation(yaw, pitch, 0.0);
+            camera.set_zoom(zoom);
             let p_0 = camera.project(LINE.0);
             let p_1 = camera.project(LINE.1);
             let p_2 = camera.project(LINE2.0);
             let p_3 = camera.project(LINE2.1);
-            let p_4 = camera.project(LINE3.0);
-            let p_5 = camera.project(LINE3.1);
+            let p_4 = camera.project(WB_0.0);
+            let p_5 = camera.project(WB_0.1);
+            let p_6 = camera.project(WB_1.0);
+            let p_7 = camera.project(WB_1.1);
 
-            println!("yaw: {yaw:.2}°, pitch: {pitch:.2}°");
+            println!("yaw: {yaw:.2}°, pitch: {pitch:.2}°, zoom: {zoom}");
 
             frame.clear();
 
             frame.draw_thick_line(p_0, p_1, 8.0, (255, 127, 127));
             frame.draw_thick_line(p_2, p_3, 8.0, (255, 127, 127));
-            frame.draw_thick_line(p_4, p_5, 8.0, (255, 127, 127));
-
-            frame.draw_line(nalgebra::Point2::new(200.0, 200.0), nalgebra::Point2::new(200.0, 300.0));
-            frame.draw_line(nalgebra::Point2::new(203.0, 250.0), nalgebra::Point2::new(203.0, 350.0));
-            frame.draw_line(nalgebra::Point2::new(250.0, 200.0), nalgebra::Point2::new(250.0, 300.0));
-            frame.draw_line(nalgebra::Point2::new(252.0, 250.0), nalgebra::Point2::new(252.0, 350.0));
-            frame.draw_line(nalgebra::Point2::new(300.0, 200.0), nalgebra::Point2::new(300.0, 300.0));
-            frame.draw_line(nalgebra::Point2::new(301.0, 250.0), nalgebra::Point2::new(301.0, 350.0));
+            frame.draw_thick_line(p_4, p_5, 4.0, (135, 84, 73));
+            frame.draw_thick_line(p_6, p_7, 4.0, (135, 84, 73));
+            frame.draw_thick_line(p_4, p_6, 4.0, (135, 84, 73));
+            frame.draw_thick_line(p_5, p_7, 4.0, (135, 84, 73));
+            frame.fill_circle(p_4.x as u32, p_4.y as u32, 170, 170, 135, 255);
+            frame.fill_circle(p_5.x as u32, p_5.y as u32, 170, 170, 135, 255);
+            frame.fill_circle(p_6.x as u32, p_6.y as u32, 170, 170, 135, 255);
+            frame.fill_circle(p_7.x as u32, p_7.y as u32, 170, 170, 135, 255);
 
             // We now submit the frame. Note that this call will be clocked so that we end up submitting at exactly the specified frame rate.
             send.send_video(&frame.video_data);
