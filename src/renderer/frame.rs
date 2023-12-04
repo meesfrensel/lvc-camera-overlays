@@ -6,9 +6,8 @@ pub struct Frame {
 }
 
 impl Frame {
-    pub fn new(width: u32, height: u32, buf: &mut Vec<u8>) -> Self {
-        // let mut buf = vec![0_u8; (width * height * 3) as usize];
-        // let mut buf = Vec::with_capacity((width * height * 3) as usize);
+    pub fn new(width: u32, height: u32) -> Self {
+        let buf = vec![0u8; (width * height * 3) as usize];
 
         Frame {
             video_data: VideoData::from_buffer(
@@ -21,8 +20,8 @@ impl Frame {
                 0,
                 width * 2, // two bytes per pixel with UYVA
                 None,
-                buf.as_mut_slice(),
-            )
+                buf.into_boxed_slice(),
+            ),
         }
     }
 

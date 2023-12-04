@@ -233,9 +233,9 @@ impl Send {
     }
 
     // Free the buffers returned by capture for metadata
-    // pub(crate) fn free_metadata(&self, metadata: &mut MetaData) {
-    //     unsafe {
-    //         NDIlib_send_free_metadata(*self.p_instance, &metadata.p_instance);
-    //     }
-    // }
+    pub(crate) fn free_metadata(&self, metadata: &mut MetaData) {
+        unsafe {
+            NDIlib_send_free_metadata(**self.p_instance, &metadata.p_instance);
+        }
+    }
 }

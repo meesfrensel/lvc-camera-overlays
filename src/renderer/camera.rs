@@ -49,7 +49,7 @@ impl Camera {
     /// with higher `z` meaning an object is closer, and lower (or more
     /// negative) `z` being further away from the camera.
     pub fn project(&self, point: Vector3<f32>) -> Point2<f32> {
-        let mut zoom_matrix = Matrix4::new(self.focal_length, 0.0, 0.0, 0.0, 0.0, self.focal_length, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
+        let zoom_matrix = Matrix4::new(self.focal_length, 0.0, 0.0, 0.0, 0.0, self.focal_length, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
         //zoom_matrix.fill_with_identity();
         let p: Vector3<f32> = INTRINSIC_PARAMS * zoom_matrix * self.rotation_matrix * point.insert_row(3, 1.0);
         let x = ((p.x / p.z) - CENTER.0) / F.0;
@@ -64,8 +64,6 @@ impl Camera {
 }
 
 mod test {
-    use super::*;
-
     #[test]
     fn test_test() {
         let mut cam = Camera::default();

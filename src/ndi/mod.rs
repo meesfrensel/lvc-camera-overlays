@@ -7,6 +7,7 @@
 //! http://ndi.tv/
 //!
 
+use core::marker;
 use std::convert::TryFrom;
 use std::ffi::{CStr, CString};
 use std::fmt::{Debug, Display};
@@ -399,8 +400,8 @@ impl Source {
     }
 }
 
-unsafe impl core::marker::Send for Source {}
-unsafe impl core::marker::Sync for Source {}
+unsafe impl marker::Send for Source {}
+unsafe impl Sync for Source {}
 
 /// Tally information
 #[repr(C)]
@@ -453,12 +454,13 @@ enum VideoParent {
 
 /// Describes a video frame
 pub struct VideoData {
+    buffer: Option<Box<[u8]>>,
     p_instance: NDIlib_video_frame_v2_t,
     parent: VideoParent,
 }
 
-unsafe impl core::marker::Send for VideoData {}
-unsafe impl core::marker::Sync for VideoData {}
+unsafe impl marker::Send for VideoData {}
+unsafe impl Sync for VideoData {}
 
 impl Debug for VideoData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -491,6 +493,7 @@ impl VideoData {
         p_instance: NDIlib_video_frame_v2_t,
     ) -> Self {
         Self {
+            buffer: None,
             p_instance,
             parent: VideoParent::Recv(recv),
         }
@@ -499,6 +502,7 @@ impl VideoData {
     /// Create an empty video frame
     pub fn new() -> Self {
         Self {
+            buffer: None,
             p_instance: NDIlib_video_frame_v2_t {
                 xres: 0,
                 yres: 0,
@@ -524,25 +528,27 @@ impl VideoData {
         width: u32,
         height: u32,
         fourcc: FourCCVideoType,
-        framerate_numerator: u32,
-        framerate_denominator: u32,
+        frame_rate_numerator: u32,
+        frame_rate_denominator: u32,
         frame_format: FrameFormatType,
         timecode: i64,
         stride: u32,
         metadata: Option<&CStr>,
-        buffer: &mut [u8],
+        mut buffer: Box<[u8]>,
     ) -> Self {
+        let p_data = buffer.as_mut_ptr();
         Self {
+            buffer: Some(buffer),
             p_instance: NDIlib_video_frame_v2_t {
                 xres: width as i32,
                 yres: height as i32,
                 FourCC: fourcc as _,
-                frame_rate_N: framerate_numerator as i32,
-                frame_rate_D: framerate_denominator as i32,
+                frame_rate_N: frame_rate_numerator as i32,
+                frame_rate_D: frame_rate_denominator as i32,
                 picture_aspect_ratio: width as f32 / height as f32,
                 frame_format_type: frame_format as _,
                 timecode,
-                p_data: buffer.as_mut_ptr(),
+                p_data,
                 // can't seem to figure out which FourCC types correspond to the "compressed format"
                 // since even for UYUV and such, it seems to still use line_stride_in_bytes rather than data_size_in_bytes
                 __bindgen_anon_1: NDIlib_video_frame_v2_t__bindgen_ty_1 {
@@ -709,8 +715,8 @@ pub struct AudioData {
     parent: AudioParent,
 }
 
-unsafe impl core::marker::Send for AudioData {}
-unsafe impl core::marker::Sync for AudioData {}
+unsafe impl marker::Send for AudioData {}
+unsafe impl Sync for AudioData {}
 
 impl Debug for AudioData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -866,7 +872,7 @@ pub struct MetaData {
     parent: MetaDataParent,
 }
 
-unsafe impl core::marker::Send for MetaData {}
+unsafe impl marker::Send for MetaData {}
 unsafe impl Sync for MetaData {}
 
 impl Debug for MetaData {
