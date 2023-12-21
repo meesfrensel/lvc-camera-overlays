@@ -4,18 +4,26 @@ kunnen via het FreeD protocol[^freed] informatie over rotatie, zoom, en focus
 doorgeven aan bijvoorbeeld dit programma. Die informatie kunnen we gebruiken om
 objecten, zoals een virtuele finishlijn, te 'projecteren' op het beeld: dit komt
 in deze implementatie op een aparte NDI stream die je als overlay kan gebruiken
-in VMix of studio monitor.
+in vMix of studio monitor.
 
 ## Getting started
 Installeer als eerste de NDI SDK op je computer (of de computer waar je het
 wilt draaien). Je kan [hier](https://ndi.video/download-ndi-sdk/) de link
 aanvragen, maar waarschijnlijk staat die ook wel in de LVC-mailbox.
 
-Zet vervolgende PTZ aan en ga naar de web interface → CamControl → FreeD. Zet
-het aan, vul je IP-adres in en zet bij de port 5555. Vergeet niet op apply te
-klikken.
+Verder heb je libclang nodig, je hoeft niet te weten wat het is en je hebt het
+ook alleen nodig om te compilen.
+- Windows: `winget install LLVM.LLVM`
+- MacOS: `brew install llvm`
+- Linux: installeer afhankelijk van je distro llvm, clang, libclang, [etc.](https://rust-lang.github.io/rust-bindgen/requirements.html)
 
-Daarna doe je dit (er vanuit gaande dat je Rust op je computer hebt):
+Als belangrijkste onderdeel heb je Rust op je computer nodig; zie https://rustup.rs/
+
+Zet vervolgende PTZ aan en ga naar de webinterface → CamControl → FreeD. Zet
+het aan, vul je IP-adres in en zet bij de port 555{ptz nummer}, bijvoorbeeld
+port 5551. Vergeet niet op apply te klikken.
+
+Daarna doe je dit:
 ```shell
 cargo run --release
 ```

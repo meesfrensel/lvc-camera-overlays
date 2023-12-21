@@ -1,5 +1,6 @@
 use std::net::UdpSocket;
 use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use crate::freed::FreeD;
 
@@ -21,14 +22,14 @@ impl Ptz {
         }
     }
 
-    pub fn start_listening(self) -> Self {
+    pub fn start_listening(self, running: Arc<AtomicBool>) -> Self {
         let port = Self::BASE_PORT + self.num as u16;
         let freed_ref = self.latest_freed_data.clone();
         std::thread::spawn(move || {
             let socket = UdpSocket::bind((Self::BASE_ADDRESS, port)).unwrap();
             let mut buf = [0u8; 29];
 
-            loop {
+            while running.load(Ordering::Relaxed) {
                 if let Ok((amount, _source)) = socket.recv_from(&mut buf) {
                     if amount == 29 {
                         if let Ok(freed) = FreeD::try_from(&buf) {

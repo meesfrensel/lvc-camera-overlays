@@ -1,3 +1,5 @@
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, SystemTime};
 use nalgebra::Vector3;
@@ -11,14 +13,26 @@ mod ptz;
 mod renderer;
 
 fn main() {
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+
+    ctrlc::set_handler(move || {
+        r.store(false, Ordering::Relaxed);
+    }).expect("Error setting Ctrl-C handler");
+
     ndi::initialize().unwrap();
     println!("NDI library initialized.");
 
-    let ptz = Ptz::new(1).start_listening();
+    let ptz = Ptz::new(1).start_listening(running.clone());
 
     println!("FreeD listener started on port 555{}.", ptz.num());
 
-    send_line(ptz);
+    send_line(ptz, running);
+
+    print!("Received interrupt, cleaning up... ");
+    // SAFETY: cleanup is done after send_line has returned; no more NDI in use
+    unsafe { ndi::cleanup(); }
+    println!("Done");
 }
 
 const LINE: (Vector3<f32>, Vector3<f32>) = (Vector3::new(0.05, -0.36, -1.8), Vector3::new(0.05, 0.0, -1.8));
@@ -26,20 +40,20 @@ const LINE2: (Vector3<f32>, Vector3<f32>) = (Vector3::new(-0.13, -0.18, -1.8), V
 const WB_0: (Vector3<f32>, Vector3<f32>) = (Vector3::new(-0.6, 0.11, -1.8), Vector3::new(0.6, 0.11, -1.8));
 const WB_1: (Vector3<f32>, Vector3<f32>) = (Vector3::new(-0.6, -0.79, -1.8), Vector3::new(0.6, -0.79, -1.8));
 
-fn send_line(ptz: Ptz) {
+fn send_line(ptz: Ptz, running: Arc<AtomicBool>) {
     let send = ndi::SendBuilder::new()
         .ndi_name(format!("PTZ-0{} line overlay", ptz.num()))
         .build()
         .unwrap();
 
-    // let mut buf = Vec::with_capacity((1920 * 1080 * 3) as usize);
     let mut frame = Frame::new(1920, 1080);
 
     let mut camera = Camera::default();
 
     let mut avg_frame_interval = 1.0 / frame.video_data.frame_rate();
+    let mut most_recent_print = SystemTime::now();
 
-    loop {
+    while running.load(Ordering::Relaxed) {
         // Get the current time
         let start_time = SystemTime::now();
 
@@ -80,8 +94,14 @@ fn send_line(ptz: Ptz) {
 
         // Get the end time
         let end_time = SystemTime::now();
-        avg_frame_interval = 0.8 * avg_frame_interval + 0.2 * end_time.duration_since(start_time).unwrap().as_secs_f32();
+        avg_frame_interval = 0.9 * avg_frame_interval + 0.1 * end_time.duration_since(start_time).unwrap().as_secs_f32();
 
-        println!("Average fps is {:.1}", 1.0 / avg_frame_interval);
+        if end_time.duration_since(most_recent_print).unwrap().as_secs_f32() > 0.5 && send.get_no_connections(0) > 0 {
+            // Move to previous line and clear it before printing
+            println!("\x1B[F\x1B[2KAverage fps is {:2.1}", 1.0 / avg_frame_interval);
+            most_recent_print = end_time;
+        }
     }
+
+    // Send instance is destroyed automatically when dropped
 }
